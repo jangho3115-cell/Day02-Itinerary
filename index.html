@@ -5,31 +5,373 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>후쿠오카 3박 4일</title>
   <style>
-    html { scroll-behavior: smooth; }
-    @media (prefers-reduced-motion: reduce) {
-      html { scroll-behavior: auto; }
+    /* ===== 디자인 토큰 (UI 기준: nol.md 관측값) ===== */
+    :root {
+      color-scheme: light;
+
+      /* 파랑은 선택·포커스·강조 숫자에만 쓴다 */
+      --primary: #4154FF;
+      --primary-weak: #F5F6FF;
+      --primary-weak2: #B2BAFF;
+
+      /* 뉴트럴 */
+      --text: #1B1C1F;
+      --text-sub: #6E6F73;
+      --text-muted: #8B8D92;
+      --line-strong: #DADBDF;
+      --line: #E9EAEF;
+      --line-weak: #F2F3F7;
+      --fill-weak: #F7F8FB;
+      --white: #FFFFFF;
+      --check-off: #B6B7BB;
+
+      /* 둥근 정도 */
+      --r-6: 6px;
+      --r-12: 12px;
+      --r-16: 16px;
+      --r-capsule: 9999px;
+
+      /* 간격 */
+      --gutter: 16px;
+      --nav-h: 61px;
+
+      --ease: cubic-bezier(.33, 1, .68, 1);
+      --font: Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+              "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
     }
-    /* 상단 링크 줄은 스크롤해도 화면 위에 남아 언제든 누를 수 있다 */
+
+    /* Day별 대표색 (--c: 점·선·Day 배지 / --cw: 카드 바탕) */
+    .day-1 { --c: #4154FF; --cw: #F5F6FF; }
+    .day-2 { --c: #008161; --cw: #EBF7F4; }
+    .day-3 { --c: #996500; --cw: #FBF5E8; }
+    .day-4 { --c: #8249D8; --cw: #F5F0FD; }
+
+    /* ===== 기본 ===== */
+    * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      background: var(--fill-weak);
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      max-width: 500px;
+      min-height: 100vh;
+      margin: 0 auto;
+      background: var(--white);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 16px;
+      line-height: 24px;
+      border-left: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+    }
+
+    h1, h2, h3, p, ul, ol { margin: 0; padding: 0; }
+    ul, ol { list-style: none; }
+
+    /* 키보드 포커스는 파란 링으로 보인다 */
+    a:focus-visible,
+    input:focus-visible {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+
+    /* ===== 헤더 ===== */
+    header {
+      padding: 32px var(--gutter) 20px;
+    }
+    h1 {
+      font-size: 24px;
+      line-height: 29px;
+      font-weight: 700;
+    }
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    /* 알약 칩: 연한 파랑 면 + 파랑 글자 */
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 2px 10px;
+      border: 1px solid var(--primary-weak2);
+      border-radius: var(--r-capsule);
+      background: var(--primary-weak);
+      color: var(--primary);
+      font-size: 12px;
+      line-height: 14px;
+      font-weight: 700;
+    }
+
+    /* ===== 상단 링크 줄 (고정) ===== */
     nav {
       position: sticky;
       top: 0;
-      padding: 10px 0;
-      background: #fff;
+      z-index: 10;
+      display: flex;
+      gap: 8px;
+      padding: 8px var(--gutter);
+      background: var(--white);
+      border-bottom: 1px solid var(--line);
     }
-    /* 이동했을 때 제목이 고정된 링크 줄에 가려지지 않게 한다 */
-    section { scroll-margin-top: 56px; }
+    nav a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 64px;
+      min-height: 44px;
+      padding: 0 16px;
+      border-radius: var(--r-capsule);
+      background: var(--fill-weak);
+      color: var(--text-sub);
+      font-size: 14px;
+      line-height: 17px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background-color .15s var(--ease), color .15s var(--ease);
+    }
+    /* 선택된 링크는 파랑이 아니라 검정 알약 */
+    nav a[aria-current="true"] {
+      background: var(--text);
+      color: var(--white);
+      font-weight: 700;
+    }
+
+    /* ===== 섹션 ===== */
+    section {
+      padding: 24px var(--gutter) 32px;
+      scroll-margin-top: var(--nav-h);
+    }
+    section + section {
+      border-top: 8px solid var(--line-weak);
+    }
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+      min-height: 29px;
+    }
+    h2 {
+      font-size: 18px;
+      line-height: 22px;
+      font-weight: 700;
+    }
+
+    /* 괄호 안 보조 설명은 작은 배지로 */
+    .meta {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 2px 8px;
+      border-radius: var(--r-6);
+      background: var(--line-weak);
+      color: var(--text-sub);
+      font-size: 12px;
+      line-height: 14px;
+      font-weight: 700;
+      vertical-align: 2px;
+      white-space: nowrap;
+    }
+
+    /* ===== 일정: 세로 타임라인 ===== */
+    .day + .day { margin-top: 28px; }
+
+    .day h3 {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 12px;
+      border-radius: var(--r-capsule);
+      background: var(--c);
+      color: var(--white);
+      font-size: 14px;
+      line-height: 17px;
+      font-weight: 700;
+    }
+
+    .day ol {
+      margin-top: 12px;
+      padding-left: 28px;
+    }
+    .day li {
+      position: relative;
+      padding: 12px 16px;
+      border-radius: var(--r-12);
+      background: var(--cw);
+      font-size: 16px;
+      line-height: 24px;
+    }
+    .day li + li { margin-top: 8px; }
+
+    /* 점 */
+    .day li::before {
+      content: "";
+      position: absolute;
+      z-index: 1;
+      top: 18px;
+      left: -26px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--c);
+      box-shadow: 0 0 0 3px var(--white);
+    }
+    /* 다음 점까지 이어지는 선 */
+    .day li:not(:last-child)::after {
+      content: "";
+      position: absolute;
+      top: 24px;
+      left: -21px;
+      width: 2px;
+      height: calc(100% + 8px);
+      background: var(--c);
+    }
+    .day .meta {
+      background: var(--white);
+      color: var(--c);
+    }
+
+    /* ===== 예산표 ===== */
+    .table-card {
+      border: 1px solid var(--line-strong);
+      border-radius: var(--r-16);
+      overflow: hidden;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 14px 16px;
+      text-align: left;
+    }
+    thead th {
+      padding: 10px 16px;
+      background: var(--fill-weak);
+      color: var(--text-sub);
+      font-size: 12px;
+      line-height: 14px;
+      font-weight: 600;
+    }
+    tbody td {
+      border-top: 1px solid var(--line-weak);
+    }
+    thead th:last-child,
+    tbody td:last-child,
+    tfoot th:last-child {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    tbody td:last-child { font-weight: 600; }
+    tfoot th {
+      padding: 16px;
+      background: var(--fill-weak);
+      border-top: 1px solid var(--line-strong);
+      font-size: 16px;
+      line-height: 24px;
+      font-weight: 700;
+    }
+    tfoot th:last-child {
+      color: var(--primary);
+      font-size: 20px;
+      line-height: 24px;
+    }
+    .note {
+      margin-top: 8px;
+      color: var(--text-sub);
+      font-size: 14px;
+      line-height: 21px;
+      text-align: right;
+    }
+
+    /* ===== 준비물 체크리스트 ===== */
+    #checklist-list li {
+      border: 1px solid var(--line-strong);
+      border-radius: var(--r-12);
+      background: var(--white);
+      transition: background-color .15s var(--ease), border-color .15s var(--ease);
+    }
+    #checklist-list li + li { margin-top: 8px; }
+    #checklist-list li.done {
+      border-color: var(--line);
+      background: var(--fill-weak);
+    }
+    #checklist-list label {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 56px;
+      padding: 0 16px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #checklist-list input {
+      -webkit-appearance: none;
+      appearance: none;
+      flex: none;
+      width: 24px;
+      height: 24px;
+      margin: 0;
+      border: 2px solid var(--check-off);
+      border-radius: var(--r-6);
+      background: var(--white) center / 16px 16px no-repeat;
+      cursor: pointer;
+      transition: background-color .15s var(--ease), border-color .15s var(--ease);
+    }
+    #checklist-list input:checked {
+      border-color: var(--primary);
+      background-color: var(--primary);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3.2 3.2L13 4.8' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    }
+    #checklist-list input:checked + .text {
+      color: var(--text-muted);
+      text-decoration: line-through;
+    }
+    #checklist-list .meta { margin-left: 0; }
+
+    noscript {
+      display: block;
+      padding: 16px var(--gutter);
+    }
+
+    /* 호버는 마우스가 있는 환경에서만 (터치 기기에 호버가 남지 않게) */
+    @media (hover: hover) and (pointer: fine) {
+      nav a:not([aria-current="true"]):hover { background: var(--line-weak); }
+      #checklist-list li:hover { border-color: var(--check-off); }
+    }
+
+    /* 큰 화면에서는 글자를 한 단계 키운다 */
+    @media (min-width: 801px) {
+      h1 { font-size: 32px; line-height: 38px; }
+      h2 { font-size: 20px; line-height: 24px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      * { transition: none !important; }
+    }
   </style>
 </head>
 <body>
 
   <header>
     <h1>후쿠오카 3박 4일</h1>
-    <p>성인 4명 · 10월 출발</p>
+    <div class="chips">
+      <span class="chip">성인 4명</span>
+      <span class="chip">10월 출발</span>
+    </div>
   </header>
 
-  <nav>
-    <a href="#schedule">일정</a> |
-    <a href="#budget">예산</a> |
+  <nav aria-label="섹션 이동">
+    <a href="#schedule">일정</a>
+    <a href="#budget">예산</a>
     <a href="#checklist">준비물</a>
   </nav>
 
@@ -37,28 +379,33 @@
 
     <!-- 일정 -->
     <section id="schedule">
-      <h2>일정</h2>
+      <div class="section-head"><h2>일정</h2></div>
       <div id="schedule-list"></div>
     </section>
 
     <!-- 예산 -->
     <section id="budget">
-      <h2>1인 예산</h2>
-      <table border="1">
-        <thead>
-          <tr><th>항목</th><th>금액</th></tr>
-        </thead>
-        <tbody id="budget-body"></tbody>
-        <tfoot>
-          <tr><th>합계</th><th id="budget-total"></th></tr>
-        </tfoot>
-      </table>
+      <div class="section-head"><h2>1인 예산</h2></div>
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr><th scope="col">항목</th><th scope="col">금액</th></tr>
+          </thead>
+          <tbody id="budget-body"></tbody>
+          <tfoot>
+            <tr><th scope="row">합계</th><th id="budget-total"></th></tr>
+          </tfoot>
+        </table>
+      </div>
+      <p class="note" id="budget-group"></p>
     </section>
 
     <!-- 준비물 -->
     <section id="checklist">
-      <h2>준비물</h2>
-      <p id="checklist-progress"></p>
+      <div class="section-head">
+        <h2>준비물</h2>
+        <p class="chip" id="checklist-progress"></p>
+      </div>
       <ul id="checklist-list"></ul>
     </section>
 
@@ -68,6 +415,8 @@
 
   <script>
     // ===== 데이터: 내용을 바꿀 때는 이 부분만 고친다 =====
+
+    const PEOPLE = 4;
 
     // 일정 (순서대로)
     const SCHEDULE = [
@@ -101,10 +450,22 @@
       return amount + '만원';
     }
 
-    function el(tag, text) {
+    function el(tag, text, cls) {
       const node = document.createElement(tag);
       if (text !== undefined) node.textContent = text;
+      if (cls) node.className = cls;
       return node;
+    }
+
+    // "나카스 포장마차 (저녁)" → 본문 + 괄호 안 내용은 작은 배지로
+    function setLabel(node, text) {
+      const m = text.match(/^(.*?)\s*\((.+)\)$/);
+      if (!m) {
+        node.appendChild(document.createTextNode(text));
+        return;
+      }
+      node.appendChild(document.createTextNode(m[1]));
+      node.appendChild(el('span', m[2], 'meta'));
     }
 
     // 저장소를 쓸 수 없는 환경(사생활 보호 모드 등)에서도 오류 없이 동작한다
@@ -128,12 +489,14 @@
     function renderSchedule() {
       const box = document.getElementById('schedule-list');
       SCHEDULE.forEach(function (d) {
-        const article = el('article');
+        const article = el('article', undefined, 'day day-' + d.day);
         article.id = 'day' + d.day;
         article.appendChild(el('h3', 'Day ' + d.day));
         const ol = el('ol');
         d.items.forEach(function (text) {
-          ol.appendChild(el('li', text));
+          const li = el('li');
+          setLabel(li, text);
+          ol.appendChild(li);
         });
         article.appendChild(ol);
         box.appendChild(article);
@@ -145,12 +508,16 @@
       let total = 0;
       BUDGET.forEach(function (row) {
         const tr = el('tr');
-        tr.appendChild(el('td', row.name));
+        const name = el('td');
+        setLabel(name, row.name);
+        tr.appendChild(name);
         tr.appendChild(el('td', won(row.amount)));
         body.appendChild(tr);
         total += row.amount;
       });
       document.getElementById('budget-total').textContent = won(total);
+      document.getElementById('budget-group').textContent =
+        PEOPLE + '명 합계 ' + won(total * PEOPLE);
     }
 
     function renderChecklist() {
@@ -168,16 +535,17 @@
         const box = el('input');
         box.type = 'checkbox';
         box.checked = checked.has(item.id);
+        li.classList.toggle('done', box.checked);
         box.addEventListener('change', function () {
           if (box.checked) checked.add(item.id);
           else checked.delete(item.id);
+          li.classList.toggle('done', box.checked);
           saveChecked(Array.from(checked));
           updateProgress();
         });
         label.appendChild(box);
-        label.appendChild(document.createTextNode(
-          ' ' + item.name + (item.note ? ' (' + item.note + ')' : '')
-        ));
+        label.appendChild(el('span', item.name, 'text'));
+        if (item.note) label.appendChild(el('span', item.note, 'meta'));
         li.appendChild(label);
         list.appendChild(li);
       });
@@ -185,16 +553,41 @@
       updateProgress();
     }
 
-    // 상단 링크를 누르면 해당 섹션으로 이동한다
+    // 상단 링크: 누르면 해당 섹션으로 이동하고, 스크롤 위치에 따라 현재 섹션을 표시한다
     function setupNav() {
-      document.querySelectorAll('nav a[href^="#"]').forEach(function (link) {
+      const links = Array.from(document.querySelectorAll('nav a[href^="#"]'));
+      const sections = links.map(function (link) {
+        return document.getElementById(link.getAttribute('href').slice(1));
+      });
+
+      links.forEach(function (link, i) {
         link.addEventListener('click', function (e) {
-          const target = document.getElementById(link.getAttribute('href').slice(1));
-          if (!target) return;
+          if (!sections[i]) return;
           e.preventDefault();
-          target.scrollIntoView();
+          sections[i].scrollIntoView();
         });
       });
+
+      function updateCurrent() {
+        const root = document.documentElement;
+        const atBottom = window.innerHeight + window.scrollY >= root.scrollHeight - 2;
+        let current = 0;
+        if (atBottom) {
+          current = sections.length - 1;
+        } else {
+          sections.forEach(function (s, i) {
+            if (s && s.getBoundingClientRect().top <= 90) current = i;
+          });
+        }
+        links.forEach(function (link, i) {
+          if (i === current) link.setAttribute('aria-current', 'true');
+          else link.removeAttribute('aria-current');
+        });
+      }
+
+      window.addEventListener('scroll', updateCurrent, { passive: true });
+      window.addEventListener('resize', updateCurrent);
+      updateCurrent();
     }
 
     renderSchedule();
