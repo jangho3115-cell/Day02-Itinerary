@@ -73,7 +73,8 @@
 
     /* 키보드 포커스는 파란 링으로 보인다 */
     a:focus-visible,
-    input:focus-visible {
+    input:focus-visible,
+    button:focus-visible {
       outline: 2px solid var(--primary);
       outline-offset: 2px;
     }
@@ -168,7 +169,7 @@
     /* 괄호 안 보조 설명은 작은 배지로 */
     .meta {
       display: inline-block;
-      margin-left: 8px;
+      margin-left: 4px; /* 앞의 공백 문자와 합쳐 약 8px */
       padding: 2px 8px;
       border-radius: var(--r-6);
       background: var(--line-weak);
@@ -283,13 +284,75 @@
       font-size: 20px;
       line-height: 24px;
     }
-    .note {
-      margin-top: 8px;
+    /* 4명 합계 줄: 1인 합계보다 한 단계 차분하게 */
+    tfoot tr + tr th {
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+    tfoot tr + tr th:last-child {
+      color: var(--text);
+      font-size: 18px;
+      line-height: 22px;
+    }
+
+    /* 금액 입력칸 */
+    tbody td { padding-top: 8px; padding-bottom: 8px; }
+    .amount-field {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .amount-field input {
+      width: 80px;
+      height: 44px;
+      padding: 0 10px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--r-12);
+      background: var(--white);
+      color: var(--text);
+      font: inherit;
+      font-weight: 600;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      transition: border-color .15s var(--ease);
+    }
+    .amount-field input:focus { border-color: var(--primary); }
+    .amount-field .unit {
+      color: var(--text-sub);
+      font-weight: 600;
+    }
+
+    .budget-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 44px;
+      margin-top: 12px;
+    }
+    .hint {
+      word-break: keep-all;
       color: var(--text-sub);
       font-size: 14px;
       line-height: 21px;
-      text-align: right;
     }
+    .btn-reset {
+      flex: none;
+      min-height: 44px;
+      padding: 0 16px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--r-capsule);
+      background: var(--white);
+      color: var(--text);
+      font: inherit;
+      font-size: 14px;
+      line-height: 17px;
+      font-weight: 600;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background-color .15s var(--ease);
+    }
+    .btn-reset[hidden] { display: none; }
 
     /* ===== 준비물 체크리스트 ===== */
     #checklist-list li {
@@ -344,6 +407,7 @@
     /* 호버는 마우스가 있는 환경에서만 (터치 기기에 호버가 남지 않게) */
     @media (hover: hover) and (pointer: fine) {
       nav a:not([aria-current="true"]):hover { background: var(--line-weak); }
+      .btn-reset:hover { background: var(--fill-weak); }
       #checklist-list li:hover { border-color: var(--check-off); }
     }
 
@@ -393,11 +457,15 @@
           </thead>
           <tbody id="budget-body"></tbody>
           <tfoot>
-            <tr><th scope="row">합계</th><th id="budget-total"></th></tr>
+            <tr><th scope="row">1인 합계</th><th id="budget-total" aria-live="polite"></th></tr>
+            <tr><th scope="row" id="budget-group-label"></th><th id="budget-group" aria-live="polite"></th></tr>
           </tfoot>
         </table>
       </div>
-      <p class="note" id="budget-group"></p>
+      <div class="budget-actions">
+        <p class="hint">금액을 눌러 직접 입력하세요</p>
+        <button type="button" class="btn-reset" id="budget-reset" hidden>기본값으로</button>
+      </div>
     </section>
 
     <!-- 준비물 -->
@@ -427,11 +495,13 @@
     ];
 
     // 1인 예산 (금액 단위: 만원)
+    // 처음 보이는 기본값이고, 페이지에서 직접 고친 금액은 이 기기에 따로 저장된다
+    // (id는 저장에 쓰이므로 바꾸지 않는다)
     const BUDGET = [
-      { name: '항공', amount: 25 },
-      { name: '숙소 (3박)', amount: 18 },
-      { name: '식비', amount: 15 },
-      { name: '교통', amount: 8 },
+      { id: 'flight', name: '항공', amount: 25 },
+      { id: 'stay', name: '숙소 (3박)', amount: 18 },
+      { id: 'food', name: '식비', amount: 15 },
+      { id: 'transport', name: '교통', amount: 8 },
     ];
 
     // 준비물 (id는 체크 상태 저장에 쓰이므로 바꾸지 않는다)
@@ -445,9 +515,22 @@
     // ===== 동작 =====
 
     const STORAGE_KEY = 'fukuoka-trip-checked';
+    const BUDGET_KEY = 'fukuoka-trip-budget';
 
+    // 금액 표시: 1,000만원 처럼 천 단위 쉼표, 소수는 최대 2자리
     function won(amount) {
-      return amount + '만원';
+      return Number(amount.toFixed(2)).toLocaleString('ko-KR') + '만원';
+    }
+
+    // 입력칸에서 읽은 글자 → 숫자 (비었거나 잘못되면 0)
+    function parseAmount(text) {
+      const n = parseFloat(text);
+      return isFinite(n) && n >= 0 ? n : 0;
+    }
+
+    // 숫자 → 입력칸에 넣을 글자
+    function plain(amount) {
+      return String(Number(amount.toFixed(2)));
     }
 
     function el(tag, text, cls) {
@@ -464,7 +547,8 @@
         node.appendChild(document.createTextNode(text));
         return;
       }
-      node.appendChild(document.createTextNode(m[1]));
+      // 본문과 배지 사이에 공백을 두어 읽기·복사 때 글자가 붙지 않게 한다
+      node.appendChild(document.createTextNode(m[1] + ' '));
       node.appendChild(el('span', m[2], 'meta'));
     }
 
@@ -503,21 +587,121 @@
       });
     }
 
+    // 직접 고친 금액 불러오기: 숫자가 아닌 값은 버리고 기본값을 쓴다
+    function loadBudget() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(BUDGET_KEY));
+        const result = {};
+        if (saved && typeof saved === 'object') {
+          Object.keys(saved).forEach(function (id) {
+            const n = saved[id];
+            if (typeof n === 'number' && isFinite(n) && n >= 0) result[id] = n;
+          });
+        }
+        return result;
+      } catch (e) {
+        return {};
+      }
+    }
+
+    function saveBudget(values) {
+      try {
+        localStorage.setItem(BUDGET_KEY, JSON.stringify(values));
+      } catch (e) {
+        // 저장 실패: 이번 화면에서만 금액이 유지된다
+      }
+    }
+
     function renderBudget() {
       const body = document.getElementById('budget-body');
-      let total = 0;
+      const totalCell = document.getElementById('budget-total');
+      const groupCell = document.getElementById('budget-group');
+      const resetBtn = document.getElementById('budget-reset');
+      const saved = loadBudget();
+      const inputs = [];
+
+      document.getElementById('budget-group-label').textContent = PEOPLE + '명 합계';
+
+      // 합계 = 입력칸 금액의 합. 입력할 때마다 1인·4명 합계를 다시 계산한다
+      function recalc() {
+        let total = 0;
+        let changed = false;
+        inputs.forEach(function (input, i) {
+          const n = parseAmount(input.value);
+          total += n;
+          if (n !== BUDGET[i].amount) changed = true;
+        });
+        totalCell.textContent = won(total);
+        groupCell.textContent = won(total * PEOPLE);
+        resetBtn.hidden = !changed;
+      }
+
+      function persist() {
+        const values = {};
+        BUDGET.forEach(function (row, i) {
+          values[row.id] = parseAmount(inputs[i].value);
+        });
+        saveBudget(values);
+      }
+
       BUDGET.forEach(function (row) {
+        const start = row.id in saved ? saved[row.id] : row.amount;
         const tr = el('tr');
         const name = el('td');
         setLabel(name, row.name);
         tr.appendChild(name);
-        tr.appendChild(el('td', won(row.amount)));
+
+        const input = el('input');
+        input.type = 'text';
+        input.inputMode = 'decimal';
+        input.maxLength = 5;
+        input.autocomplete = 'off';
+        input.value = plain(start);
+        input.setAttribute('enterkeyhint', 'done');
+        input.setAttribute('aria-label', row.name + ' 금액 (만원)');
+
+        // 숫자와 소수점 하나만 받는다
+        input.addEventListener('input', function () {
+          let v = input.value.replace(/[^\d.]/g, '');
+          const dot = v.indexOf('.');
+          if (dot >= 0) v = v.slice(0, dot + 1) + v.slice(dot + 1).replace(/\./g, '');
+          if (v !== input.value) input.value = v;
+          recalc();
+          persist();
+        });
+        // 입력칸을 벗어나면 "007", "" 같은 값을 깔끔한 숫자로 정리한다
+        input.addEventListener('blur', function () {
+          input.value = plain(parseAmount(input.value));
+          recalc();
+          persist();
+        });
+        input.addEventListener('focus', function () {
+          input.select();
+        });
+        input.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') input.blur();
+        });
+
+        const field = el('div', undefined, 'amount-field');
+        field.appendChild(input);
+        field.appendChild(el('span', '만원', 'unit'));
+        const cell = el('td');
+        cell.appendChild(field);
+        tr.appendChild(cell);
+
         body.appendChild(tr);
-        total += row.amount;
+        inputs.push(input);
       });
-      document.getElementById('budget-total').textContent = won(total);
-      document.getElementById('budget-group').textContent =
-        PEOPLE + '명 합계 ' + won(total * PEOPLE);
+
+      resetBtn.addEventListener('click', function () {
+        inputs.forEach(function (input, i) {
+          input.value = plain(BUDGET[i].amount);
+        });
+        recalc();
+        persist();
+      });
+
+      recalc();
     }
 
     function renderChecklist() {
@@ -545,7 +729,10 @@
         });
         label.appendChild(box);
         label.appendChild(el('span', item.name, 'text'));
-        if (item.note) label.appendChild(el('span', item.note, 'meta'));
+        if (item.note) {
+          label.appendChild(document.createTextNode(' '));
+          label.appendChild(el('span', item.note, 'meta'));
+        }
         li.appendChild(label);
         list.appendChild(li);
       });
