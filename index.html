@@ -4,58 +4,41 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>후쿠오카 3박 4일</title>
+  <style>
+    html { scroll-behavior: smooth; }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+    }
+    /* 상단 링크 줄은 스크롤해도 화면 위에 남아 언제든 누를 수 있다 */
+    nav {
+      position: sticky;
+      top: 0;
+      padding: 10px 0;
+      background: #fff;
+    }
+    /* 이동했을 때 제목이 고정된 링크 줄에 가려지지 않게 한다 */
+    section { scroll-margin-top: 56px; }
+  </style>
 </head>
 <body>
 
   <header>
     <h1>후쿠오카 3박 4일</h1>
     <p>성인 4명 · 10월 출발</p>
-    <nav>
-      <a href="#schedule">일정</a> |
-      <a href="#budget">예산</a> |
-      <a href="#checklist">준비물</a>
-    </nav>
   </header>
+
+  <nav>
+    <a href="#schedule">일정</a> |
+    <a href="#budget">예산</a> |
+    <a href="#checklist">준비물</a>
+  </nav>
 
   <main>
 
     <!-- 일정 -->
     <section id="schedule">
       <h2>일정</h2>
-
-      <article id="day1">
-        <h3>Day 1</h3>
-        <ol>
-          <li>오후 도착</li>
-          <li>캐널시티</li>
-          <li>나카스 포장마차 (저녁)</li>
-        </ol>
-      </article>
-
-      <article id="day2">
-        <h3>Day 2</h3>
-        <ol>
-          <li>다자이후 텐만구</li>
-          <li>스타벅스 다자이후점</li>
-          <li>모츠나베 (저녁)</li>
-        </ol>
-      </article>
-
-      <article id="day3">
-        <h3>Day 3</h3>
-        <ol>
-          <li>유후인 당일치기 (버스 왕복)</li>
-          <li>긴린코 호수</li>
-        </ol>
-      </article>
-
-      <article id="day4">
-        <h3>Day 4</h3>
-        <ol>
-          <li>하카타역 쇼핑</li>
-          <li>오후 출국</li>
-        </ol>
-      </article>
+      <div id="schedule-list"></div>
     </section>
 
     <!-- 예산 -->
@@ -65,14 +48,9 @@
         <thead>
           <tr><th>항목</th><th>금액</th></tr>
         </thead>
-        <tbody>
-          <tr><td>항공</td><td>25만원</td></tr>
-          <tr><td>숙소 (3박)</td><td>18만원</td></tr>
-          <tr><td>식비</td><td>15만원</td></tr>
-          <tr><td>교통</td><td>8만원</td></tr>
-        </tbody>
+        <tbody id="budget-body"></tbody>
         <tfoot>
-          <tr><th>합계</th><th id="budget-total">66만원</th></tr>
+          <tr><th>합계</th><th id="budget-total"></th></tr>
         </tfoot>
       </table>
     </section>
@@ -80,18 +58,149 @@
     <!-- 준비물 -->
     <section id="checklist">
       <h2>준비물</h2>
-      <ul>
-        <li>여권</li>
-        <li>유심</li>
-        <li>엔화 (1인 3만엔)</li>
-        <li>우산</li>
-      </ul>
+      <p id="checklist-progress"></p>
+      <ul id="checklist-list"></ul>
     </section>
 
   </main>
 
+  <noscript>이 페이지는 JavaScript가 켜져 있어야 내용이 보입니다.</noscript>
+
   <script>
-    // 2단계에서 일정·예산·준비물 데이터와 동작을 여기에 추가한다.
+    // ===== 데이터: 내용을 바꿀 때는 이 부분만 고친다 =====
+
+    // 일정 (순서대로)
+    const SCHEDULE = [
+      { day: 1, items: ['오후 도착', '캐널시티', '나카스 포장마차 (저녁)'] },
+      { day: 2, items: ['다자이후 텐만구', '스타벅스 다자이후점', '모츠나베 (저녁)'] },
+      { day: 3, items: ['유후인 당일치기 (버스 왕복)', '긴린코 호수'] },
+      { day: 4, items: ['하카타역 쇼핑', '오후 출국'] },
+    ];
+
+    // 1인 예산 (금액 단위: 만원)
+    const BUDGET = [
+      { name: '항공', amount: 25 },
+      { name: '숙소 (3박)', amount: 18 },
+      { name: '식비', amount: 15 },
+      { name: '교통', amount: 8 },
+    ];
+
+    // 준비물 (id는 체크 상태 저장에 쓰이므로 바꾸지 않는다)
+    const CHECKLIST = [
+      { id: 'passport', name: '여권' },
+      { id: 'sim', name: '유심' },
+      { id: 'yen', name: '엔화', note: '1인 3만엔' },
+      { id: 'umbrella', name: '우산' },
+    ];
+
+    // ===== 동작 =====
+
+    const STORAGE_KEY = 'fukuoka-trip-checked';
+
+    function won(amount) {
+      return amount + '만원';
+    }
+
+    function el(tag, text) {
+      const node = document.createElement(tag);
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+
+    // 저장소를 쓸 수 없는 환경(사생활 보호 모드 등)에서도 오류 없이 동작한다
+    function loadChecked() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        return Array.isArray(saved) ? saved : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveChecked(ids) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
+      } catch (e) {
+        // 저장 실패: 이번 화면에서만 체크 상태가 유지된다
+      }
+    }
+
+    function renderSchedule() {
+      const box = document.getElementById('schedule-list');
+      SCHEDULE.forEach(function (d) {
+        const article = el('article');
+        article.id = 'day' + d.day;
+        article.appendChild(el('h3', 'Day ' + d.day));
+        const ol = el('ol');
+        d.items.forEach(function (text) {
+          ol.appendChild(el('li', text));
+        });
+        article.appendChild(ol);
+        box.appendChild(article);
+      });
+    }
+
+    function renderBudget() {
+      const body = document.getElementById('budget-body');
+      let total = 0;
+      BUDGET.forEach(function (row) {
+        const tr = el('tr');
+        tr.appendChild(el('td', row.name));
+        tr.appendChild(el('td', won(row.amount)));
+        body.appendChild(tr);
+        total += row.amount;
+      });
+      document.getElementById('budget-total').textContent = won(total);
+    }
+
+    function renderChecklist() {
+      const list = document.getElementById('checklist-list');
+      const progress = document.getElementById('checklist-progress');
+      const checked = new Set(loadChecked());
+
+      function updateProgress() {
+        progress.textContent = checked.size + ' / ' + CHECKLIST.length + ' 완료';
+      }
+
+      CHECKLIST.forEach(function (item) {
+        const li = el('li');
+        const label = el('label');
+        const box = el('input');
+        box.type = 'checkbox';
+        box.checked = checked.has(item.id);
+        box.addEventListener('change', function () {
+          if (box.checked) checked.add(item.id);
+          else checked.delete(item.id);
+          saveChecked(Array.from(checked));
+          updateProgress();
+        });
+        label.appendChild(box);
+        label.appendChild(document.createTextNode(
+          ' ' + item.name + (item.note ? ' (' + item.note + ')' : '')
+        ));
+        li.appendChild(label);
+        list.appendChild(li);
+      });
+
+      updateProgress();
+    }
+
+    // 상단 링크를 누르면 해당 섹션으로 이동한다
+    function setupNav() {
+      document.querySelectorAll('nav a[href^="#"]').forEach(function (link) {
+        link.addEventListener('click', function (e) {
+          const target = document.getElementById(link.getAttribute('href').slice(1));
+          if (!target) return;
+          e.preventDefault();
+          target.scrollIntoView();
+        });
+      });
+    }
+
+    renderSchedule();
+    renderBudget();
+    renderChecklist();
+    setupNav();
   </script>
 
 </body>
